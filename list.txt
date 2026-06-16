@@ -1,0 +1,6 @@
+# Contoh file list URL YouTube
+# Baris yang diawali # adalah komentar dan akan diabaikan
+# Format: satu URL per baris
+
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://youtu.be/QkPk1mXIMZo
