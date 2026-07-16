@@ -6,6 +6,7 @@ import webbrowser
 import urllib.request
 import zipfile
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.console import Console
 from rich.panel import Panel
@@ -24,6 +25,21 @@ except ImportError:
     sys.exit(1)
 
 console = Console()
+
+MP3_QUALITIES = {
+    '128': {'label': '128kbps (Cepat, ukuran kecil)', 'value': '128'},
+    '192': {'label': '192kbps (Recommended)', 'value': '192'},
+    '320': {'label': '320kbps (High Quality)', 'value': '320'},
+    'vbr0': {'label': 'VBR 0 (Terbaik - variable bitrate)', 'value': 'vbr0'},
+}
+
+MP4_QUALITIES = {
+    '720': {'label': '720p (HD - cepat, kecil)', 'value': '720'},
+    '1080': {'label': '1080p (Full HD - recommended)', 'value': '1080'},
+    'best': {'label': 'Best (kualitas tertinggi)', 'value': 'best'},
+}
+
+CONCURRENT_WORKERS = 3
 
 
 def find_ffmpeg():
@@ -130,7 +146,6 @@ def auto_install_ffmpeg():
                 dst = os.path.join(bin_dir, 'ffprobe.exe')
                 shutil.move(src, dst)
 
-        # Cleanup extracted subfolder
         for item in os.listdir(install_dir):
             item_path = os.path.join(install_dir, item)
             if item != 'bin' and os.path.isdir(item_path):
@@ -152,7 +167,10 @@ def auto_install_ffmpeg():
         return None
 
 
-def show_menu():
+def show_menu(download_format, quality):
+    fmt_text = "MP3" if download_format == 'mp3' else "MP4"
+    q_text = quality if download_format == 'mp4' else MP3_QUALITIES.get(quality, {}).get('label', quality)
+
     table = Table.grid(padding=1)
     table.add_column(style="cyan", justify="right")
     table.add_column(style="white")
@@ -163,8 +181,8 @@ def show_menu():
 
     panel = Panel(
         Align.center(table),
-        title="[bold green]CLI YouTube Downloader[/]",
-        subtitle="[dim]cli-ytdownloader[/]",
+        title=f"[bold green]CLI YouTube Downloader[/]",
+        subtitle=f"[dim]{fmt_text} | {q_text} | {CONCURRENT_WORKERS}x parallel[/]",
         border_style="green",
         padding=(1, 2),
     )
@@ -181,77 +199,79 @@ def donasi():
     console.print("[cyan]https://sociabuzz.com/trisnosanjaya[/]")
 
 
-def download_audio(url, output_dir="downloads", ffmpeg_path=None, download_format='mp3'):
-    os.makedirs(output_dir, exist_ok=True)
+def build_ydl_opts(output_dir, ffmpeg_path, download_format, quality):
+    ydl_opts = {
+        'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
+        'quiet': True,
+        'no_warnings': True,
+        'throttled_rate': '100M',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+    }
 
     if download_format == 'mp3':
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-        }
-
+        ydl_opts['format'] = 'bestaudio/best'
         if ffmpeg_path:
             ffmpeg_dir = os.path.dirname(ffmpeg_path)
-            ffprobe_exe = os.path.join(ffmpeg_dir, 'ffprobe.exe')
-            ffprobe_exists = os.path.exists(ffprobe_exe) or shutil.which('ffprobe') or shutil.which('ffprobe.exe')
-
-            if ffprobe_exists:
-                ydl_opts['postprocessors'] = [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }]
-                console.print("  [green](FFmpeg terdeteksi - akan dikonversi ke MP3 192kbps)[/]")
-            else:
-                console.print("  [yellow]Peringatan: ffprobe tidak ditemukan[/]")
-                console.print("  [yellow](akan menyimpan format audio asli)[/]")
+            ffprobe = shutil.which('ffprobe') or shutil.which('ffprobe.exe') or os.path.exists(os.path.join(ffmpeg_dir, 'ffprobe.exe'))
+            if ffprobe:
+                pp = {'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}
+                if quality == 'vbr0':
+                    pp['preferredquality'] = '320'
+                    ydl_opts['postprocessor_args'] = {'ffmpeg': ['-q:a', '0']}
+                else:
+                    pp['preferredquality'] = quality
+                ydl_opts['postprocessors'] = [pp]
             ydl_opts['ffmpeg_location'] = ffmpeg_dir
-        else:
-            console.print("  [yellow](Tidak ada FFmpeg - akan menyimpan format audio asli)[/]")
     else:
         if ffmpeg_path:
-            fmt = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-            console.print("  [cyan](Mendownload video MP4 + Audio)[/]")
-        else:
-            fmt = 'best[ext=mp4]/best'
-            console.print("  [yellow](Tidak ada FFmpeg - mendownload video dengan audio bawaan)[/]")
-
-        ydl_opts = {
-            'format': fmt,
-            'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-        }
-        if ffmpeg_path:
+            height_fmt = {
+                '720': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]',
+                '1080': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]',
+                'best': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            }
+            ydl_opts['format'] = height_fmt.get(quality, height_fmt['1080'])
             ydl_opts['ffmpeg_location'] = os.path.dirname(ffmpeg_path)
+        else:
+            fallback = {
+                '720': 'best[height<=720][ext=mp4]/best[height<=720]',
+                '1080': 'best[height<=1080][ext=mp4]/best[height<=1080]',
+                'best': 'best[ext=mp4]/best',
+            }
+            ydl_opts['format'] = fallback.get(quality, fallback['1080'])
+
+    return ydl_opts
+
+
+def download_audio(url, output_dir="downloads", ffmpeg_path=None, download_format='mp3', quality='192'):
+    os.makedirs(output_dir, exist_ok=True)
+    ydl_opts = build_ydl_opts(output_dir, ffmpeg_path, download_format, quality)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        return True
+        return True, None
     except Exception as e:
         error_msg = str(e)
         if 'ffmpeg' in error_msg.lower() or 'ffprobe' in error_msg.lower():
-            console.print("[bold red]Error: FFmpeg/ffprobe tidak ditemukan. Install FFmpeg untuk mengunduh format ini.[/]")
-        else:
-            console.print(f"[bold red]Error downloading {url}:[/] {e}")
-        return False
+            return False, "FFmpeg/ffprobe tidak ditemukan"
+        return False, str(e)
 
 
-def single_download(ffmpeg_path=None, download_format='mp3'):
+def single_download(ffmpeg_path=None, download_format='mp3', quality='192'):
     url = Prompt.ask("\n[bold cyan]Masukkan URL YouTube[/]").strip()
     if not url:
         console.print("[bold red]URL tidak boleh kosong![/]")
         return
 
     console.print(f"\n[bold]Mendownload:[/] [cyan]{url}[/]")
-    if download_audio(url, ffmpeg_path=ffmpeg_path, download_format=download_format):
+    success, err = download_audio(url, ffmpeg_path=ffmpeg_path, download_format=download_format, quality=quality)
+    if success:
         console.print("[bold green]Download selesai![/]")
+    else:
+        console.print(f"[bold red]Error:[/] {err}")
 
 
-def batch_download(ffmpeg_path=None, download_format='mp3'):
+def batch_download(ffmpeg_path=None, download_format='mp3', quality='192'):
     file_path = Prompt.ask("\n[bold cyan]Masukkan path file .txt[/]").strip()
 
     if not os.path.exists(file_path):
@@ -271,25 +291,32 @@ def batch_download(ffmpeg_path=None, download_format='mp3'):
 
     total = len(urls)
     success_count = 0
+    console.print(f"\n[bold cyan]Memulai batch {total} download ({CONCURRENT_WORKERS}x parallel)...[/]")
 
-    progress = Progress(
+    with Progress(
         SpinnerColumn(),
         TextColumn("[bold]{task.description}[/]"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeRemainingColumn(),
         console=console,
-        transient=False,
-    )
+    ) as progress:
+        task = progress.add_task(f"[cyan]0/{total} selesai", total=total)
 
-    with progress:
-        task = progress.add_task("[cyan]Memproses batch...", total=total)
-
-        for i, url in enumerate(urls, 1):
-            progress.update(task, description=f"[cyan]Mendownload ({i}/{total})")
-            if download_audio(url, ffmpeg_path=ffmpeg_path, download_format=download_format):
-                success_count += 1
-            progress.advance(task)
+        with ThreadPoolExecutor(max_workers=CONCURRENT_WORKERS) as executor:
+            fut_map = {
+                executor.submit(download_audio, url, ffmpeg_path=ffmpeg_path, download_format=download_format, quality=quality): url
+                for url in urls
+            }
+            for future in as_completed(fut_map):
+                url = fut_map[future]
+                succ, err = future.result()
+                if succ:
+                    success_count += 1
+                progress.update(task, advance=1,
+                                description=f"[cyan]{success_count}/{total} selesai")
+                if not succ:
+                    console.print(f"  [red]Gagal:[/] {url[:60]}... - {err[:40]}")
 
     console.print(Panel(
         f"[bold green]Batch selesai! {success_count}/{total} berhasil didownload.[/]"
@@ -299,13 +326,7 @@ def batch_download(ffmpeg_path=None, download_format='mp3'):
     ))
 
 
-def main():
-    ffmpeg_path = check_ffmpeg()
-    if ffmpeg_path:
-        console.print(f"\n[green]FFmpeg:[/] [cyan]{ffmpeg_path}[/]")
-    else:
-        console.print("\n[yellow]Berjalan tanpa FFmpeg (fitur MP3/MP4+Audio terbatas)[/]")
-
+def select_format_and_quality():
     console.print("\n[bold]Pilih format download:[/]")
     console.print(Panel(
         "[cyan]1.[/] MP3 (Audio only)\n"
@@ -316,14 +337,41 @@ def main():
     format_choice = Prompt.ask("Pilih format", choices=["1", "2"], default="1")
     download_format = 'mp3' if format_choice != '2' else 'mp4'
 
+    if download_format == 'mp3':
+        console.print("\n[bold]Pilih kualitas MP3:[/]")
+        lines = [f"  [cyan]{k}.[/] {v['label']}" for k, v in MP3_QUALITIES.items()]
+        console.print(Panel("\n".join(lines), border_style="blue", padding=(1, 2)))
+        q_keys = list(MP3_QUALITIES.keys())
+        q_choice = Prompt.ask("Pilih kualitas", choices=[str(i + 1) for i in range(len(q_keys))], default="2")
+        quality = q_keys[int(q_choice) - 1]
+    else:
+        console.print("\n[bold]Pilih kualitas MP4:[/]")
+        lines = [f"  [cyan]{k}.[/] {v['label']}" for k, v in MP4_QUALITIES.items()]
+        console.print(Panel("\n".join(lines), border_style="blue", padding=(1, 2)))
+        q_keys = list(MP4_QUALITIES.keys())
+        q_choice = Prompt.ask("Pilih kualitas", choices=[str(i + 1) for i in range(len(q_keys))], default="2")
+        quality = q_keys[int(q_choice) - 1]
+
+    return download_format, quality
+
+
+def main():
+    ffmpeg_path = check_ffmpeg()
+    if ffmpeg_path:
+        console.print(f"\n[green]FFmpeg:[/] [cyan]{ffmpeg_path}[/]")
+    else:
+        console.print("\n[yellow]Berjalan tanpa FFmpeg (fitur MP3/MP4+Audio terbatas)[/]")
+
+    download_format, quality = select_format_and_quality()
+
     while True:
-        show_menu()
+        show_menu(download_format, quality)
         choice = Prompt.ask("[bold cyan]Pilih menu[/]", choices=["1", "2", "3", "4"])
 
         if choice == '1':
-            single_download(ffmpeg_path, download_format)
+            single_download(ffmpeg_path, download_format, quality)
         elif choice == '2':
-            batch_download(ffmpeg_path, download_format)
+            batch_download(ffmpeg_path, download_format, quality)
         elif choice == '3':
             donasi()
         elif choice == '4':

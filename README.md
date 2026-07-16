@@ -1,35 +1,24 @@
 # CLI YouTube Downloader
 
-A command-line tool to download YouTube videos as MP3 or MP4 with a modern Rich-powered interactive UI.
+A command-line tool to download YouTube videos as MP3 or MP4, plus a modern **GUI version** built with CustomTkinter.
 
 ## Features
 
-- **Rich Interactive UI** — Styled panels, color-coded menus, progress bars, spinners
+- **Dual Interface** — CLI (Rich-powered) & GUI (CustomTkinter)
 - **Single Download** — Download one YouTube video/audio
-- **Batch Download** — Download multiple videos from a text file with progress bar & ETA
-- **MP3/MP4 Selection** — Choose audio-only (MP3 192kbps) or video (MP4) format
-- **Auto FFmpeg Install** — Download & install FFmpeg automatically from within the app
+- **Batch Download** — Parallel download (3x) from a text file
+- **Real-time Progress** — Live percentage, speed & ETA in both CLI & GUI
+- **MP3 Quality Options** — 128kbps / 192kbps / 320kbps / VBR 0 (Best)
+- **MP4 Quality Options** — 720p (HD) / 1080p (Full HD) / Best
+- **Auto FFmpeg Install** — Download & install FFmpeg automatically
 - **FFmpeg Detection** — Finds FFmpeg in PATH, common Windows locations, or local `ffmpeg/bin/`
+- **YouTube 403 Bypass** — Uses Android + Web player clients to avoid throttling
 - **Donation Support** — Support the developer via Sociabuzz
-
-## Demo
-
-```
-┌─────────────────────────────────────────────┐
-│           CLI YouTube Downloader            │
-│             cli-ytdownloader                │
-├─────────────────────────────────────────────┤
-│              1.  Single Download            │
-│              2.  File List Download         │
-│              3.  Donasi                     │
-│              4.  Keluar                     │
-└─────────────────────────────────────────────┘
-```
 
 ## Requirements
 
 - Python 3.8+
-- Dependencies installed via `pip install -r requirements.txt`
+- Dependencies: `pip install -r requirements.txt`
 
 ## Installation
 
@@ -37,10 +26,21 @@ A command-line tool to download YouTube videos as MP3 or MP4 with a modern Rich-
 pip install -r requirements.txt
 ```
 
+For GUI version on Linux:
+```cmd
+pip install customtkinter pillow
+```
+
 ## Usage
 
+### CLI Version
 ```cmd
 python cli-ytdownloader.py
+```
+
+### GUI Version
+```cmd
+python ytdownloader-gui.py
 ```
 
 On first run, if FFmpeg is not found, the program will offer to download it automatically.
@@ -50,10 +50,25 @@ On first run, if FFmpeg is not found, the program will offer to download it auto
 Create a text file (e.g., `list.txt`) with one YouTube URL per line:
 
 ```
-# Komentar akan diabaikan
+# Comments are ignored
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://youtu.be/QkPk1mXIMZo
 ```
+
+## Quality Options
+
+| MP3 | Bitrate |
+|-----|---------|
+| 128kbps | Fast, small file |
+| 192kbps | Recommended (default) |
+| 320kbps | High quality |
+| VBR 0 | Best quality (variable bitrate) |
+
+| MP4 | Resolution |
+|-----|------------|
+| 720p | HD |
+| 1080p | Full HD (default) |
+| Best | Highest available |
 
 ## How Auto FFmpeg Install Works
 
@@ -67,12 +82,13 @@ https://youtu.be/QkPk1mXIMZo
 
 ```
 cli-ytdownloader/
-├── cli-ytdownloader.py  # Main program
-├── requirements.txt     # Python dependencies
-├── README.md           # This file
-├── list.txt           # Example batch file
-├── downloads/          # Downloaded videos/audio
-└── ffmpeg/             # Auto-installed FFmpeg (gitignored)
+├── cli-ytdownloader.py   # CLI version (Rich-powered)
+├── ytdownloader-gui.py   # GUI version (CustomTkinter)
+├── requirements.txt      # Python dependencies
+├── README.md             # This file
+├── list.txt              # Example batch file
+├── downloads/            # Downloaded videos/audio
+└── ffmpeg/               # Auto-installed FFmpeg (gitignored)
     └── bin/
         ├── ffmpeg.exe
         └── ffprobe.exe

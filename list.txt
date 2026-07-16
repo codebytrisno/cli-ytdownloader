@@ -2,5 +2,6 @@
 # Baris yang diawali # adalah komentar dan akan diabaikan
 # Format: satu URL per baris
 
-https://www.youtube.com/watch?v=dQw4w9WgXcQ
-https://youtu.be/QkPk1mXIMZo
+https://youtu.be/zLOr7_W6FcE?si=MoxKwxicFu8-0qwK
+https://youtu.be/nTLzVkPn-f8?si=Kz4LfSpaQYk7vYLj
+https://youtu.be/Kgvn0Wp4HC0?si=v1JlNWK-4HDl_Mo-
