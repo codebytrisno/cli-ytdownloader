@@ -15,8 +15,80 @@ except ImportError:
     messagebox.showerror("Error", "yt-dlp tidak terinstall.\nJalankan: pip install yt-dlp")
     sys.exit(1)
 
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("green")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+# ── Programmatic theme overrides (indigo accent) ───────────────
+_t = ctk.ThemeManager.theme
+_t["CTk"]["fg_color"] = ["#f0f0f0", "#0e0e12"]
+_t["CTkFrame"]["fg_color"] = ["#ffffff", "#16161c"]
+_t["CTkFrame"]["top_fg_color"] = ["#fafafa", "#1c1c24"]
+_t["CTkButton"]["fg_color"] = ["#6366f1", "#6366f1"]
+_t["CTkButton"]["hover_color"] = ["#5558e3", "#7c7ff5"]
+_t["CTkButton"]["corner_radius"] = 10
+_t["CTkLabel"]["text_color"] = ["#1a1a1a", "#e4e4e7"]
+_t["CTkEntry"]["fg_color"] = ["#f4f4f5", "#1a1a22"]
+_t["CTkEntry"]["border_color"] = ["#d4d4d8", "#2a2a34"]
+_t["CTkEntry"]["text_color"] = ["#1a1a1a", "#e4e4e7"]
+_t["CTkEntry"]["placeholder_text_color"] = ["#a1a1aa", "#52525b"]
+_t["CTkEntry"]["corner_radius"] = 10
+_t["CTkComboBox"]["fg_color"] = ["#f4f4f5", "#1a1a22"]
+_t["CTkComboBox"]["border_color"] = ["#d4d4d8", "#2a2a34"]
+_t["CTkComboBox"]["text_color"] = ["#1a1a1a", "#e4e4e7"]
+_t["CTkComboBox"]["button_color"] = ["#6366f1", "#6366f1"]
+_t["CTkComboBox"]["button_hover_color"] = ["#5558e3", "#7c7ff5"]
+_t["CTkComboBox"]["corner_radius"] = 10
+_t["CTkProgressBar"]["fg_color"] = ["#e4e4e7", "#2a2a34"]
+_t["CTkProgressBar"]["progress_color"] = ["#6366f1", "#818cf8"]
+_t["CTkProgressBar"]["corner_radius"] = 8
+_t["CTkRadioButton"]["fg_color"] = ["#6366f1", "#6366f1"]
+_t["CTkRadioButton"]["hover_color"] = ["#5558e3", "#7c7ff5"]
+_t["CTkTextbox"]["fg_color"] = ["#f4f4f5", "#1a1a22"]
+_t["CTkTextbox"]["border_color"] = ["#d4d4d8", "#2a2a34"]
+_t["CTkTextbox"]["text_color"] = ["#1a1a1a", "#e4e4e7"]
+_t["CTkTextbox"]["corner_radius"] = 10
+_t["CTkSegmentedButton"]["selected_color"] = ["#6366f1", "#6366f1"]
+_t["CTkSegmentedButton"]["selected_hover_color"] = ["#5558e3", "#7c7ff5"]
+_t["CTkSegmentedButton"]["unselected_color"] = ["#f4f4f5", "#1a1a22"]
+_t["CTkSegmentedButton"]["unselected_hover_color"] = ["#e4e4e7", "#2a2a34"]
+_t["CTkSegmentedButton"]["corner_radius"] = 10
+_t["CTkSwitch"]["fg_color"] = ["#d4d4d8", "#2a2a34"]
+_t["CTkSwitch"]["progress_color"] = ["#6366f1", "#6366f1"]
+_t["CTkSlider"]["progress_color"] = ["#6366f1", "#818cf8"]
+_t["CTkSlider"]["button_color"] = ["#6366f1", "#818cf8"]
+_t["CTkOptionMenu"]["fg_color"] = ["#6366f1", "#6366f1"]
+_t["CTkOptionMenu"]["button_color"] = ["#5558e3", "#5558e3"]
+_t["CTkCheckBox"]["fg_color"] = ["#6366f1", "#6366f1"]
+_t["CTkCheckBox"]["hover_color"] = ["#5558e3", "#7c7ff5"]
+_t["CTkFont"]["family"] = "Roboto"
+
+# ── Color palette ──────────────────────────────────────────────
+ACCENT       = "#6366f1"
+ACCENT_HOVER = "#5558e3"
+ACCENT_LIGHT = "#818cf8"
+SUCCESS      = "#10b981"
+ERROR        = "#ef4444"
+WARNING      = "#f59e0b"
+ROSE         = "#f43f5e"
+ROSE_HOVER   = "#e11d48"
+TEXT         = "#e4e4e7"
+TEXT_SEC     = "#a1a1aa"
+TEXT_MUTED   = "#71717a"
+CARD         = "#16161c"
+CARD_ALT     = "#1c1c24"
+BORDER       = "#27272f"
+
+# ── Font definitions ───────────────────────────────────────────
+F_TITLE    = ("Roboto", 24, "bold")
+F_SUBTITLE = ("Roboto", 13)
+F_SECTION  = ("Roboto", 12, "bold")
+F_BODY     = ("Roboto", 13)
+F_SMALL    = ("Roboto", 11)
+F_BTN      = ("Roboto", 13, "bold")
+F_BTN_SM   = ("Roboto", 12, "bold")
+F_MONO     = ("Consolas", 11)
 
 MP3_QUALITIES = {
     '128': '128kbps (Cepat)',
@@ -32,6 +104,10 @@ MP4_QUALITIES = {
 }
 
 CONCURRENT_WORKERS = 3
+
+
+class DownloadCancelled(Exception):
+    pass
 
 
 def find_ffmpeg():
@@ -97,7 +173,7 @@ def build_ydl_opts(output_dir, ffmpeg_path, download_format, quality):
 
 
 class DownloadThread(threading.Thread):
-    def __init__(self, url, output_dir, download_format, ffmpeg_path, quality, finished_callback, progress_callback=None, index=0, total=1):
+    def __init__(self, url, output_dir, download_format, ffmpeg_path, quality, finished_callback, progress_callback=None, index=0, total=1, cancel_event=None):
         super().__init__()
         self.url = url
         self.output_dir = output_dir
@@ -108,6 +184,7 @@ class DownloadThread(threading.Thread):
         self.progress_callback = progress_callback
         self.index = index
         self.total = total
+        self.cancel_event = cancel_event or threading.Event()
         self.daemon = True
 
     def run(self):
@@ -116,6 +193,8 @@ class DownloadThread(threading.Thread):
 
         if self.progress_callback:
             def hook(d):
+                if self.cancel_event.is_set():
+                    raise DownloadCancelled("Download dibatalkan oleh pengguna")
                 if d['status'] == 'downloading':
                     total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
                     downloaded = d.get('downloaded_bytes', 0)
@@ -131,190 +210,364 @@ class DownloadThread(threading.Thread):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.url])
             self.finished_callback(True, self.url, self.index, self.total, None)
+        except DownloadCancelled:
+            self.finished_callback(False, self.url, self.index, self.total, "Dibatalkan")
         except Exception as e:
             self.finished_callback(False, self.url, self.index, self.total, str(e))
 
 
+# ════════════════════════════════════════════════════════════════
+#  UI HELPERS
+# ════════════════════════════════════════════════════════════════
+def make_card(parent, **kw):
+    return ctk.CTkFrame(parent, fg_color=CARD, corner_radius=14,
+                        border_width=1, border_color=BORDER, **kw)
+
+def make_section_label(parent, text):
+    return ctk.CTkLabel(parent, text=text, font=F_SECTION,
+                        text_color=TEXT_SEC, anchor="w")
+
+def make_primary_btn(parent, text, command, width=160):
+    return ctk.CTkButton(parent, text=text, command=command, width=width,
+                         font=F_BTN, height=40, corner_radius=10,
+                         fg_color=ACCENT, hover_color=ACCENT_HOVER)
+
+def make_ghost_btn(parent, text, command, width=120):
+    return ctk.CTkButton(parent, text=text, command=command, width=width,
+                         font=F_BTN_SM, height=40, corner_radius=10,
+                         fg_color=CARD_ALT, hover_color=BORDER,
+                         text_color=TEXT_SEC, border_width=1, border_color=BORDER)
+
+def make_danger_btn(parent, text, command, width=100):
+    return ctk.CTkButton(parent, text=text, command=command, width=width,
+                         font=F_BTN_SM, height=40, corner_radius=10,
+                         fg_color="#dc2626", hover_color="#b91c1c", text_color="#ffffff")
+
+
+# ════════════════════════════════════════════════════════════════
+#  APP
+# ════════════════════════════════════════════════════════════════
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("YouTube Downloader")
-        self.geometry("640x620")
-        self.minsize(600, 560)
+        self.geometry("720x700")
+        self.minsize(660, 640)
 
         self.ffmpeg_path = find_ffmpeg()
         self.download_format = "mp3"
         self.mp3_quality = "192"
         self.mp4_quality = "1080"
-        self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
+        self.output_dir = os.path.join(SCRIPT_DIR, "downloads")
         os.makedirs(self.output_dir, exist_ok=True)
+
+        self._cancel_event = threading.Event()
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         self.after(100, self.setup_ui)
 
+    # ── Layout skeleton ────────────────────────────────────────
     def setup_ui(self):
-        header = ctk.CTkLabel(self, text="YouTube Downloader", font=ctk.CTkFont(size=22, weight="bold"))
-        header.pack(pady=(15, 2))
+        self._build_header()
+        self._build_tabs()
+        self._build_footer()
 
-        sub = ctk.CTkLabel(self, text="Download video/audio dari YouTube", font=ctk.CTkFont(size=13))
-        sub.pack(pady=(0, 8))
+    def _build_header(self):
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 0))
+        header.grid_columnconfigure(0, weight=1)
 
-        ffmpeg_status = ctk.CTkLabel(
-            self,
-            text=f"FFmpeg: [TERDETEKSI]" if self.ffmpeg_path else "FFmpeg: [TIDAK DITEMUKAN - fitur terbatas]",
-            text_color="#2ecc71" if self.ffmpeg_path else "#e74c3c",
-            font=ctk.CTkFont(size=12),
+        # Accent bar
+        bar = ctk.CTkFrame(header, height=3, fg_color=ACCENT, corner_radius=0)
+        bar.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+
+        # Title row
+        title = ctk.CTkLabel(header, text="YouTube Downloader",
+                             font=F_TITLE, text_color=TEXT, anchor="w")
+        title.grid(row=1, column=0, sticky="w")
+
+        sub = ctk.CTkLabel(header, text="Download video & audio dari YouTube dengan mudah",
+                           font=F_SUBTITLE, text_color=TEXT_SEC, anchor="w")
+        sub.grid(row=2, column=0, sticky="w", pady=(0, 10))
+
+        # FFmpeg badge
+        badge_frame = ctk.CTkFrame(header, fg_color="transparent")
+        badge_frame.grid(row=3, column=0, sticky="w")
+
+        ok = self.ffmpeg_path is not None
+        dot_color = SUCCESS if ok else ERROR
+        badge_text = "FFmpeg Terdeteksi" if ok else "FFmpeg Tidak Ditemukan — fitur terbatas"
+
+        dot = ctk.CTkLabel(badge_frame, text="\u25CF", text_color=dot_color,
+                           font=("Roboto", 8))
+        dot.pack(side="left", padx=(0, 5))
+
+        ctk.CTkLabel(badge_frame, text=badge_text, text_color=dot_color,
+                     font=F_SMALL).pack(side="left")
+
+    def _build_tabs(self):
+        self.tabview = ctk.CTkTabview(
+            self, corner_radius=14,
+            segmented_button_selected_color=ACCENT,
+            segmented_button_selected_hover_color=ACCENT_HOVER,
+            segmented_button_unselected_color=CARD_ALT,
+            segmented_button_unselected_hover_color=BORDER,
+            fg_color=CARD,
         )
-        ffmpeg_status.pack(pady=(0, 10))
+        self.tabview.grid(row=1, column=0, sticky="nsew", padx=24, pady=12)
 
-        tabview = ctk.CTkTabview(self, width=580, height=440)
-        tabview.pack(padx=15, pady=(0, 10), fill="both", expand=True)
-
-        tab_single = tabview.add("Single Download")
-        tab_batch = tabview.add("Batch Download")
-        tab_settings = tabview.add("Pengaturan")
+        tab_single = self.tabview.add("  Single  ")
+        tab_batch = self.tabview.add("  Batch  ")
+        tab_settings = self.tabview.add("  Pengaturan  ")
 
         self.setup_single_tab(tab_single)
         self.setup_batch_tab(tab_batch)
         self.setup_settings_tab(tab_settings)
 
+    def _build_footer(self):
+        footer = ctk.CTkFrame(self, fg_color="transparent", height=24)
+        footer.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 14))
+        footer.grid_columnconfigure(0, weight=1)
+
+        self.footer_label = ctk.CTkLabel(footer, text="", font=F_SMALL,
+                                         text_color=TEXT_MUTED, anchor="w")
+        self.footer_label.grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(footer, text="yt-dlp  \u00B7  customtkinter",
+                     font=("Roboto", 10), text_color=TEXT_MUTED
+                     ).grid(row=0, column=1, sticky="e")
+
+        self.update_footer()
+
+    def update_footer(self):
+        q = self.get_current_quality_label()
+        fmt = "MP3" if self.download_format == 'mp3' else "MP4"
+        self.footer_label.configure(
+            text=f"Format: {fmt}  \u00B7  Kualitas: {q}  \u00B7  Parallel: {CONCURRENT_WORKERS}x")
+
+    # ── Single tab ─────────────────────────────────────────────
     def setup_single_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
 
-        url_label = ctk.CTkLabel(parent, text="URL YouTube:", anchor="w", font=ctk.CTkFont(size=13))
-        url_label.grid(row=0, column=0, sticky="w", padx=10, pady=(15, 2))
+        # Card: URL input
+        card_url = make_card(parent)
+        card_url.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
+        card_url.grid_columnconfigure(0, weight=1)
 
-        self.url_entry = ctk.CTkEntry(parent, placeholder_text="https://www.youtube.com/watch?v=...")
-        self.url_entry.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        make_section_label(card_url, "URL YOUTUBE").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 4))
 
-        self.single_info = ctk.CTkLabel(parent, text="", font=ctk.CTkFont(size=11), text_color="gray", anchor="w")
-        self.single_info.grid(row=2, column=0, sticky="w", padx=10, pady=(0, 5))
+        self.url_entry = ctk.CTkEntry(card_url, placeholder_text="https://www.youtube.com/watch?v=...",
+                                      height=38, font=F_BODY)
+        self.url_entry.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 10))
 
-        self.single_progress = ctk.CTkProgressBar(parent, mode="indeterminate")
-        self.single_progress.grid(row=3, column=0, sticky="ew", padx=10, pady=(5, 5))
+        self.single_info = ctk.CTkLabel(card_url, text="", font=F_SMALL,
+                                        text_color=TEXT_MUTED, anchor="w")
+        self.single_info.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 14))
+
+        # Card: Progress
+        card_prog = make_card(parent)
+        card_prog.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+        card_prog.grid_columnconfigure(0, weight=1)
+
+        self.single_progress = ctk.CTkProgressBar(card_prog, height=10)
+        self.single_progress.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
         self.single_progress.set(0)
 
-        self.single_status = ctk.CTkLabel(parent, text="", font=ctk.CTkFont(size=12))
-        self.single_status.grid(row=4, column=0, sticky="w", padx=10, pady=(0, 5))
+        self.single_status = ctk.CTkLabel(card_prog, text="Siap untuk download",
+                                          font=F_SMALL, text_color=TEXT_MUTED, anchor="w")
+        self.single_status.grid(row=1, column=0, sticky="w", padx=16, pady=(0, 16))
 
+        # Buttons
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        btn_frame.grid(row=5, column=0, pady=(5, 15))
+        btn_frame.grid(row=3, column=0, pady=(4, 8))
 
-        self.single_btn = ctk.CTkButton(btn_frame, text="Download", width=160, command=self.start_single_download)
-        self.single_btn.pack(side="left", padx=5)
+        self.single_btn = make_primary_btn(btn_frame, "\u25B6  Download", self.start_single_download, width=170)
+        self.single_btn.pack(side="left", padx=6)
 
-        ctk.CTkButton(btn_frame, text="Buka Folder", width=120, command=self.open_downloads).pack(side="left", padx=5)
+        self.single_cancel_btn = make_danger_btn(btn_frame, "\u25A0  Batal", self.cancel_single, width=100)
+        self.single_cancel_btn.pack(side="left", padx=6)
+        self.single_cancel_btn.pack_forget()
+
+        make_ghost_btn(btn_frame, "\u25C7  Buka Folder", self.open_downloads, width=140).pack(side="left", padx=6)
 
         self.update_single_info()
 
+    # ── Batch tab ──────────────────────────────────────────────
     def setup_batch_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
 
-        file_label = ctk.CTkLabel(parent, text="File .txt berisi URL:", anchor="w", font=ctk.CTkFont(size=13))
-        file_label.grid(row=0, column=0, sticky="w", padx=10, pady=(15, 2))
+        # Card: File selection
+        card_file = make_card(parent)
+        card_file.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
+        card_file.grid_columnconfigure(0, weight=1)
 
-        file_sel_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        file_sel_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
-        file_sel_frame.grid_columnconfigure(0, weight=1)
+        make_section_label(card_file, "FILE URL LIST").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 4))
 
-        self.batch_file_entry = ctk.CTkEntry(file_sel_frame, placeholder_text="Pilih file .txt...")
-        self.batch_file_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        file_sel = ctk.CTkFrame(card_file, fg_color="transparent")
+        file_sel.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 10))
+        file_sel.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(file_sel_frame, text="Browse", width=80, command=self.browse_file).grid(row=0, column=1)
+        self.batch_file_entry = ctk.CTkEntry(file_sel, placeholder_text="Pilih file .txt berisi URL...",
+                                             height=38, font=F_BODY)
+        self.batch_file_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        self.batch_info = ctk.CTkLabel(parent, text="", font=ctk.CTkFont(size=11), text_color="gray", anchor="w")
-        self.batch_info.grid(row=2, column=0, sticky="w", padx=10, pady=(0, 5))
+        ctk.CTkButton(file_sel, text="Browse", width=80, height=38,
+                      font=F_BTN_SM, corner_radius=10,
+                      fg_color=CARD_ALT, hover_color=BORDER,
+                      text_color=TEXT_SEC, border_width=1, border_color=BORDER,
+                      command=self.browse_file).grid(row=0, column=1)
 
-        self.batch_progress = ctk.CTkProgressBar(parent, mode="determinate")
-        self.batch_progress.grid(row=3, column=0, sticky="ew", padx=10, pady=(5, 5))
+        self.batch_info = ctk.CTkLabel(card_file, text="", font=F_SMALL,
+                                       text_color=TEXT_MUTED, anchor="w")
+        self.batch_info.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 14))
+
+        # Card: Progress
+        card_prog = make_card(parent)
+        card_prog.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+        card_prog.grid_columnconfigure(0, weight=1)
+
+        self.batch_progress = ctk.CTkProgressBar(card_prog, height=10)
+        self.batch_progress.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
         self.batch_progress.set(0)
 
-        self.batch_status = ctk.CTkLabel(parent, text="", font=ctk.CTkFont(size=12))
-        self.batch_status.grid(row=4, column=0, sticky="w", padx=10, pady=(0, 5))
+        self.batch_status = ctk.CTkLabel(card_prog, text="Siap untuk batch download",
+                                         font=F_SMALL, text_color=TEXT_MUTED, anchor="w")
+        self.batch_status.grid(row=1, column=0, sticky="w", padx=16, pady=(0, 16))
 
-        self.batch_detail = ctk.CTkTextbox(parent, height=120, font=ctk.CTkFont(size=11))
-        self.batch_detail.grid(row=5, column=0, sticky="ew", padx=10, pady=(5, 5))
+        # Card: Log (expands)
+        card_log = make_card(parent)
+        card_log.grid(row=2, column=0, sticky="nsew", padx=4, pady=(0, 8))
+        card_log.grid_columnconfigure(0, weight=1)
+        card_log.grid_rowconfigure(1, weight=1)
 
+        make_section_label(card_log, "LOG PROGRESS").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 4))
+
+        self.batch_detail = ctk.CTkTextbox(card_log, font=F_MONO,
+                                           fg_color="#12121a", text_color=TEXT, border_width=0)
+        self.batch_detail.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.batch_detail.insert("end", "Siap menampilkan log download...\n")
+
+        # Buttons
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        btn_frame.grid(row=6, column=0, pady=(5, 15))
+        btn_frame.grid(row=3, column=0, pady=(4, 8))
 
-        self.batch_btn = ctk.CTkButton(btn_frame, text="Mulai Batch", width=160, command=self.start_batch_download)
-        self.batch_btn.pack(side="left", padx=5)
+        self.batch_btn = make_primary_btn(btn_frame, "\u25B6  Mulai Batch", self.start_batch_download, width=170)
+        self.batch_btn.pack(side="left", padx=6)
 
-        ctk.CTkButton(btn_frame, text="Buka Folder", width=120, command=self.open_downloads).pack(side="left", padx=5)
+        self.batch_cancel_btn = make_danger_btn(btn_frame, "\u25A0  Batal", self.cancel_batch, width=100)
+        self.batch_cancel_btn.pack(side="left", padx=6)
+        self.batch_cancel_btn.pack_forget()
+
+        make_ghost_btn(btn_frame, "\u25C7  Buka Folder", self.open_downloads, width=140).pack(side="left", padx=6)
 
         self.update_batch_info()
 
+    # ── Settings tab ───────────────────────────────────────────
     def setup_settings_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
-        fmt_label = ctk.CTkLabel(parent, text="Format Download:", font=ctk.CTkFont(size=14, weight="bold"))
-        fmt_label.grid(row=0, column=0, sticky="w", padx=10, pady=(15, 5))
+        # ── Card: Format ───────────────────────────────────────
+        card_fmt = make_card(parent)
+        card_fmt.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 8))
+        card_fmt.grid_columnconfigure(0, weight=1)
 
-        self.format_var = ctk.StringVar(value="mp3")
-        mp3_radio = ctk.CTkRadioButton(parent, text="MP3 (Audio)", variable=self.format_var, value="mp3", command=self.on_format_change)
-        mp3_radio.grid(row=1, column=0, sticky="w", padx=20, pady=2)
-        mp4_radio = ctk.CTkRadioButton(parent, text="MP4 (Video + Audio)", variable=self.format_var, value="mp4", command=self.on_format_change)
-        mp4_radio.grid(row=2, column=0, sticky="w", padx=20, pady=2)
+        make_section_label(card_fmt, "FORMAT DOWNLOAD").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 6))
 
-        sep = ctk.CTkFrame(parent, height=1, fg_color="gray")
-        sep.grid(row=3, column=0, sticky="ew", padx=10, pady=12)
+        self.format_var = ctk.StringVar(value="MP3 (Audio)")
+        self.format_seg = ctk.CTkSegmentedButton(
+            card_fmt,
+            values=["MP3 (Audio)", "MP4 (Video)"],
+            variable=self.format_var,
+            command=self.on_format_change,
+            height=38, corner_radius=10,
+            selected_color=ACCENT, selected_hover_color=ACCENT_HOVER,
+            unselected_color=CARD_ALT, unselected_hover_color=BORDER,
+            text_color=TEXT, font=F_BTN_SM,
+        )
+        self.format_seg.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
 
-        q_label = ctk.CTkLabel(parent, text="Kualitas:", font=ctk.CTkFont(size=14, weight="bold"))
-        q_label.grid(row=4, column=0, sticky="w", padx=10, pady=(0, 5))
+        # ── Card: Quality ──────────────────────────────────────
+        card_q = make_card(parent)
+        card_q.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 8))
+        card_q.grid_columnconfigure(0, weight=1)
 
-        self.mp3_q_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        self.mp3_q_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 5))
+        make_section_label(card_q, "KUALITAS").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 6))
+
+        self.mp3_q_frame = ctk.CTkFrame(card_q, fg_color="transparent")
+        self.mp3_q_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
         self.mp3_q_frame.grid_columnconfigure(0, weight=1)
 
         self.mp3_quality_var = ctk.StringVar(value="192")
         self.mp3_combo = ctk.CTkComboBox(
             self.mp3_q_frame, values=list(MP3_QUALITIES.values()),
-            command=self.on_mp3_quality_change, width=300,
+            command=self.on_mp3_quality_change, height=38,
+            font=F_BODY, dropdown_font=F_BODY,
         )
-        self.mp3_combo.pack(side="left", padx=5)
+        self.mp3_combo.grid(row=0, column=0, sticky="ew")
         self.mp3_combo.set(MP3_QUALITIES["192"])
 
-        self.mp4_q_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        self.mp4_q_frame.grid(row=6, column=0, sticky="ew", padx=10, pady=(0, 5))
+        self.mp4_q_frame = ctk.CTkFrame(card_q, fg_color="transparent")
+        self.mp4_q_frame.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 16))
         self.mp4_q_frame.grid_columnconfigure(0, weight=1)
 
         self.mp4_quality_var = ctk.StringVar(value="1080")
         self.mp4_combo = ctk.CTkComboBox(
             self.mp4_q_frame, values=list(MP4_QUALITIES.values()),
-            command=self.on_mp4_quality_change, width=300,
+            command=self.on_mp4_quality_change, height=38,
+            font=F_BODY, dropdown_font=F_BODY,
         )
-        self.mp4_combo.pack(side="left", padx=5)
+        self.mp4_combo.grid(row=0, column=0, sticky="ew")
         self.mp4_combo.set(MP4_QUALITIES["1080"])
-
-        parallel_label = ctk.CTkLabel(parent, text=f"Parallel Batch: {CONCURRENT_WORKERS}x download", font=ctk.CTkFont(size=12), text_color="gray")
-        parallel_label.grid(row=7, column=0, sticky="w", padx=20, pady=(2, 5))
 
         self._toggle_quality_frames()
 
-        sep2 = ctk.CTkFrame(parent, height=1, fg_color="gray")
-        sep2.grid(row=8, column=0, sticky="ew", padx=10, pady=12)
+        # Parallel info
+        ctk.CTkLabel(card_q, text=f"Parallel Batch: {CONCURRENT_WORKERS}x download",
+                     font=F_SMALL, text_color=TEXT_MUTED, anchor="w"
+                     ).grid(row=3, column=0, sticky="w", padx=16, pady=(0, 14))
 
-        dir_label = ctk.CTkLabel(parent, text="Folder Download:", font=ctk.CTkFont(size=14, weight="bold"))
-        dir_label.grid(row=9, column=0, sticky="w", padx=10, pady=(0, 5))
+        # ── Card: Output directory ─────────────────────────────
+        card_dir = make_card(parent)
+        card_dir.grid(row=2, column=0, sticky="ew", padx=4, pady=(0, 8))
+        card_dir.grid_columnconfigure(0, weight=1)
 
-        dir_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        dir_frame.grid(row=10, column=0, sticky="ew", padx=10, pady=(0, 10))
+        make_section_label(card_dir, "FOLDER DOWNLOAD").grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 6))
+
+        dir_frame = ctk.CTkFrame(card_dir, fg_color="transparent")
+        dir_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
         dir_frame.grid_columnconfigure(0, weight=1)
 
-        self.dir_label = ctk.CTkLabel(dir_frame, text=self.output_dir, font=ctk.CTkFont(size=11), text_color="gray", anchor="w")
-        self.dir_label.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        self.dir_label = ctk.CTkLabel(dir_frame, text=self.output_dir, font=F_SMALL,
+                                      text_color=TEXT_MUTED, anchor="w", wraplength=400)
+        self.dir_label.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        ctk.CTkButton(dir_frame, text="Ganti", width=80, command=self.change_output_dir).grid(row=0, column=1)
+        ctk.CTkButton(dir_frame, text="Ganti", width=70, height=34,
+                      font=F_BTN_SM, corner_radius=10,
+                      fg_color=CARD_ALT, hover_color=BORDER,
+                      text_color=TEXT_SEC, border_width=1, border_color=BORDER,
+                      command=self.change_output_dir).grid(row=0, column=1)
 
-        sep3 = ctk.CTkFrame(parent, height=1, fg_color="gray")
-        sep3.grid(row=11, column=0, sticky="ew", padx=10, pady=12)
+        # ── Donasi ─────────────────────────────────────────────
+        donasi_btn = ctk.CTkButton(parent, text="\u2665  Donasi", width=140, height=40,
+                                   font=F_BTN, corner_radius=10,
+                                   fg_color=ROSE, hover_color=ROSE_HOVER,
+                                   command=self.open_donasi)
+        donasi_btn.grid(row=3, column=0, pady=(8, 12))
 
-        donasi_btn = ctk.CTkButton(parent, text="Donasi", width=120, fg_color="#e74c3c", hover_color="#c0392b", command=self.open_donasi)
-        donasi_btn.grid(row=12, column=0, padx=10, pady=5)
-
+    # ── Toggle & callbacks ─────────────────────────────────────
     def _toggle_quality_frames(self):
-        is_mp3 = self.format_var.get() == "mp3"
+        is_mp3 = "MP3" in self.format_var.get()
         if is_mp3:
             self.mp3_q_frame.grid()
             self.mp4_q_frame.grid_remove()
@@ -322,23 +575,26 @@ class App(ctk.CTk):
             self.mp3_q_frame.grid_remove()
             self.mp4_q_frame.grid()
 
-    def on_format_change(self):
-        self.download_format = self.format_var.get()
+    def on_format_change(self, choice=None):
+        self.download_format = "mp3" if "MP3" in self.format_var.get() else "mp4"
         self._toggle_quality_frames()
         self.update_single_info()
         self.update_batch_info()
+        self.update_footer()
 
     def on_mp3_quality_change(self, choice):
         rev = {v: k for k, v in MP3_QUALITIES.items()}
         self.mp3_quality = rev.get(choice, '192')
         self.update_single_info()
         self.update_batch_info()
+        self.update_footer()
 
     def on_mp4_quality_change(self, choice):
         rev = {v: k for k, v in MP4_QUALITIES.items()}
         self.mp4_quality = rev.get(choice, '1080')
         self.update_single_info()
         self.update_batch_info()
+        self.update_footer()
 
     def get_current_quality_label(self):
         if self.download_format == 'mp3':
@@ -349,13 +605,14 @@ class App(ctk.CTk):
     def update_single_info(self):
         q = self.get_current_quality_label()
         fmt = "MP3" if self.download_format == 'mp3' else "MP4"
-        self.single_info.configure(text=f"Format: {fmt} | Kualitas: {q}")
+        self.single_info.configure(text=f"Format: {fmt}  \u00B7  Kualitas: {q}")
 
     def update_batch_info(self):
         q = self.get_current_quality_label()
         fmt = "MP3" if self.download_format == 'mp3' else "MP4"
-        self.batch_info.configure(text=f"Format: {fmt} | Kualitas: {q} | Parallel: {CONCURRENT_WORKERS}x")
+        self.batch_info.configure(text=f"Format: {fmt}  \u00B7  Kualitas: {q}  \u00B7  Parallel: {CONCURRENT_WORKERS}x")
 
+    # ── File / directory helpers ───────────────────────────────
     def change_output_dir(self):
         path = filedialog.askdirectory(initialdir=self.output_dir, title="Pilih folder download")
         if path:
@@ -377,23 +634,26 @@ class App(ctk.CTk):
         else:
             try:
                 import subprocess
-                subprocess.Popen(['xdg-open', self.output_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(['xdg-open', self.output_dir],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except FileNotFoundError:
-                self.batch_status.configure(text="Error: xdg-open tidak ditemukan. Buka manual foldernya.")
+                self.batch_status.configure(text="Error: xdg-open tidak ditemukan.", text_color=ERROR)
 
     def open_donasi(self):
         webbrowser.open("https://sociabuzz.com/trisnosanjaya")
 
+    # ── Single download ────────────────────────────────────────
     def start_single_download(self):
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning("Peringatan", "URL tidak boleh kosong!")
             return
 
+        self._cancel_event.clear()
         self.single_btn.configure(state="disabled", text="Downloading...")
-        self.single_progress.configure(mode="determinate")
+        self.single_cancel_btn.pack(side="left", padx=6)
         self.single_progress.set(0)
-        self.single_status.configure(text=f"Mendownload: {url[:50]}...", text_color="white")
+        self.single_status.configure(text=f"Mendownload: {url[:50]}...", text_color=ACCENT_LIGHT)
 
         quality = self.mp3_quality if self.download_format == 'mp3' else self.mp4_quality
 
@@ -404,28 +664,35 @@ class App(ctk.CTk):
             url, self.output_dir, self.download_format, self.ffmpeg_path, quality,
             finished_callback=self.single_finished,
             progress_callback=on_progress,
+            cancel_event=self._cancel_event,
         ).start()
+
+    def cancel_single(self):
+        self._cancel_event.set()
+        self.single_status.configure(text="Membatalkan...", text_color=WARNING)
 
     def _update_single_progress(self, pct, speed, eta, status):
         self.single_progress.set(pct / 100)
         if status == 'processing':
-            self.single_status.configure(text="Memproses audio... (FFmpeg)")
+            self.single_status.configure(text="Memproses audio... (FFmpeg)", text_color=WARNING)
         else:
-            self.single_status.configure(text=f"{pct:.1f}% | {speed} | ETA {eta}")
+            self.single_status.configure(text=f"{pct:.1f}%  \u00B7  {speed}  \u00B7  ETA {eta}", text_color=ACCENT_LIGHT)
 
     def single_finished(self, success, url, *args):
         self.after(0, lambda: self._single_finished_ui(success, url, args))
 
     def _single_finished_ui(self, success, url, args):
         self.single_progress.set(1 if success else 0)
-        self.single_btn.configure(state="normal", text="Download")
+        self.single_cancel_btn.pack_forget()
+        self.single_btn.configure(state="normal", text="\u25B6  Download")
 
         if success:
-            self.single_status.configure(text="Selesai! File tersimpan di folder downloads/.", text_color="#2ecc71")
+            self.single_status.configure(text="\u2714  Selesai! File tersimpan di folder downloads/", text_color=SUCCESS)
         else:
             err = args[-1] if len(args) > 2 and args[-1] else "Unknown error"
-            self.single_status.configure(text=f"Gagal: {err[:60]}", text_color="#e74c3c")
+            self.single_status.configure(text=f"\u2717  Gagal: {err[:60]}", text_color=ERROR)
 
+    # ── Batch download ─────────────────────────────────────────
     def start_batch_download(self):
         file_path = self.batch_file_entry.get().strip()
         if not file_path or not os.path.exists(file_path):
@@ -439,17 +706,22 @@ class App(ctk.CTk):
             messagebox.showwarning("Peringatan", "Tidak ada URL valid dalam file!")
             return
 
+        self._cancel_event.clear()
         self.total_batch = len(urls)
         self.batch_success = 0
 
         self.batch_btn.configure(state="disabled", text="Memproses...")
-        self.batch_progress.configure(mode="determinate")
+        self.batch_cancel_btn.pack(side="left", padx=6)
         self.batch_progress.set(0)
         self.batch_detail.delete("0.0", "end")
         self.batch_detail.insert("end", f"Memulai batch {self.total_batch} download ({CONCURRENT_WORKERS}x parallel)...\n")
-        self.batch_status.configure(text=f"0/{self.total_batch} selesai")
+        self.batch_status.configure(text=f"0/{self.total_batch} selesai", text_color=ACCENT_LIGHT)
 
         self._run_parallel_batch(urls)
+
+    def cancel_batch(self):
+        self._cancel_event.set()
+        self.batch_status.configure(text="Membatalkan...", text_color=WARNING)
 
     def _run_parallel_batch(self, urls):
         quality = self.mp3_quality if self.download_format == 'mp3' else self.mp4_quality
@@ -466,7 +738,7 @@ class App(ctk.CTk):
                 url, self.output_dir, self.download_format, self.ffmpeg_path, quality,
                 finished_callback=lambda s, u, i, t, e: on_item_done(s, u, i, t, e),
                 progress_callback=lambda p, s, e, st: on_item_progress(idx, p, s, e, st),
-                index=idx, total=total,
+                index=idx, total=total, cancel_event=self._cancel_event,
             )
             t.run()
 
@@ -508,24 +780,28 @@ class App(ctk.CTk):
         if line_num:
             if success:
                 self.batch_detail.delete(f"{line_num}.0", f"{line_num}.0 lineend")
-                self.batch_detail.insert(f"{line_num}.0", f"[#{idx+1}] [OK] {url[:40]}...\n")
+                self.batch_detail.insert(f"{line_num}.0", f"[#{idx+1}] [\u2714 OK] {url[:40]}...\n")
             else:
                 err = error or "Unknown"
                 self.batch_detail.delete(f"{line_num}.0", f"{line_num}.0 lineend")
-                self.batch_detail.insert(f"{line_num}.0", f"[#{idx+1}] [FAIL] {url[:40]}... - {err[:30]}\n")
+                self.batch_detail.insert(f"{line_num}.0", f"[#{idx+1}] [\u2717 FAIL] {url[:40]}... - {err[:30]}\n")
 
         self.batch_detail.see("end")
         self.batch_progress.set(done / total)
-        self.batch_status.configure(text=f"{done}/{total} selesai")
+        self.batch_status.configure(text=f"{done}/{total} selesai", text_color=ACCENT_LIGHT)
 
     def _batch_all_done(self):
         total = self.total_batch
-        self.batch_btn.configure(state="normal", text="Mulai Batch")
-        color = "#2ecc71" if self.batch_success == total else "#e74c3c"
-        self.batch_status.configure(
-            text=f"Batch selesai! {self.batch_success}/{total} berhasil.",
-            text_color=color,
-        )
+        self.batch_btn.configure(state="normal", text="\u25B6  Mulai Batch")
+        self.batch_cancel_btn.pack_forget()
+        if self.batch_success == total:
+            self.batch_status.configure(
+                text=f"\u2714  Batch selesai! {self.batch_success}/{total} berhasil.",
+                text_color=SUCCESS)
+        else:
+            self.batch_status.configure(
+                text=f"\u2717  Batch selesai! {self.batch_success}/{total} berhasil.",
+                text_color=ERROR)
 
 
 if __name__ == "__main__":

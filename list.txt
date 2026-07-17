@@ -1,7 +1,23 @@
-# Contoh file list URL YouTube
-# Baris yang diawali # adalah komentar dan akan diabaikan
-# Format: satu URL per baris
+# RHOMA IRAMA
+# 20 lagu pilihan - official music video & live performance
 
-https://youtu.be/zLOr7_W6FcE?si=MoxKwxicFu8-0qwK
-https://youtu.be/nTLzVkPn-f8?si=Kz4LfSpaQYk7vYLj
-https://youtu.be/Kgvn0Wp4HC0?si=v1JlNWK-4HDl_Mo-
+https://youtu.be/3Df9rVpAwac   # RHOMA IRAMA - RELA (OFFICIAL MUSIC VIDEO)
+https://youtu.be/I_VeVkggICU   # RHOMA IRAMA - SENYUM (OFFICIAL MUSIC VIDEO)
+https://youtu.be/Z4yZ1XagoDI   # RHOMA IRAMA - DOSA YANG MENGHANTUI (OFFICIAL MUSIC VIDEO)
+https://youtu.be/W0HPqtKrPxc   # RHOMA IRAMA & ELVY SUKAESIH - CINTA DALAM KHAYALAN (OFFICIAL MUSIC VIDEO)
+https://youtu.be/s5aAxr8dIiQ   # RHOMA IRAMA - MAHITELI (OFFICIAL MUSIC VIDEO)
+https://youtu.be/zAn6pbESq-s   # RHOMA IRAMA - AHLAK (OFFICIAL VIDEO)
+https://youtu.be/7GfKHZSTBy4   # RHOMA IRAMA FEAT. RITA SUGIARTO - TULUS HATI LUHUR BUDI (OFFICIAL MUSIC VIDEO)
+https://youtu.be/PwMGVUQkmOM   # RHOMA IRAMA & SONETA GROUP FEAT. ELVY SUKAESIH - RUJUK (LIVE)
+https://youtu.be/JKfO43Q7uUQ   # LIMA - RHOMA IRAMA & SONETA GROUP (LIVE ON AKSI 2025 KEMENANGAN)
+https://youtu.be/CqsiN58SEn4   # IT'S UP TO US - RHOMA IRAMA & SONETA GROUP (LIVE AT RAMADAN PARTY)
+https://youtu.be/31JomeBsHeY   # LAPAR - RHOMA IRAMA & SONETA GROUP (LIVE AT MEGA KONSER RHOMANTIKA IRAMA)
+https://youtu.be/-tL75DRKkmU   # HARAM - RHOMA IRAMA & SONETA GROUP FEAT. TASYA & APRIL DA7 (LIVE)
+https://youtu.be/upZs6ie5Q0I   # RHOMA IRAMA & SONETA - YANG (LIVE)
+https://youtu.be/WpJGxfyQ8DU   # IBU KOTA - RHOMA IRAMA & SONETA GROUP (LIVE MEGA KONSER DA7)
+https://youtu.be/Q128qw3AOZA   # SANTAI - RHOMA IRAMA & SONETA GROUP (LIVE AT ITA 2024)
+https://youtu.be/ZFsTNxX2iHE   # PENGABDIAN - RHOMA IRAMA & SONETA GROUP (LIVE AT PESTA RAYA RAMADAN)
+https://youtu.be/OpTKDi6Ky50   # ZULFIKAR - RHOMA IRAMA & SONETA GROUP (LIVE AT ANUGERAH DANGDUT INDONESIA 2025)
+https://youtu.be/uqNJyNaNSgI   # RHOMA IRAMA & SONETA GROUP - JATUH CINTA (LIVE)
+https://youtu.be/JkpcggjmYF8   # RHOMA IRAMA & SONETA FT. ELVY SUKAESIH - BAHTERA CINTA (LIVE)
+https://youtu.be/gmb_YiUPc04   # RHOMA IRAMA & SONETA GROUP - KATA PUJANGGA (LIVE AT PINTU LANGIT, PRIGEN)
